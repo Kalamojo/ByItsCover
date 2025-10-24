@@ -6,6 +6,10 @@
 
 *.user
 
+# Python Venv
+
+clipenv/
+
 # Build results
 
 [Dd]ebug/
