@@ -17,7 +17,7 @@ public class ClipService
         _options = options.Value;
     }
 
-    public async Task<EmbeddingsResponse> GetCoverEmbeddings(List<Edition> editionList, CancellationToken cancellationToken)
+    public async Task<IEnumerable<Cover>> GetCoverEmbeddings(List<Edition> editionList, CancellationToken cancellationToken)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, _options.ClipURL);
         request.Content = JsonContent.Create( new
@@ -35,7 +35,15 @@ public class ClipService
             throw new ArgumentNullException(nameof(embeddings), "Embeddings response was unable to be deserialized.");
         }
 
-        embeddings.Editions = editionList;
-        return embeddings;
+        var coverEmbeddings = embeddings.ImageEmbeddings.Zip(editionList)
+            .Select(x => new Cover
+            {
+                CoverId = x.Second.Id,
+                Isbn13 = x.Second.Isbn13,
+                Url = x.Second.Image?.Url,
+                Embedding = x.First
+            });
+        
+        return coverEmbeddings;
     }
 }

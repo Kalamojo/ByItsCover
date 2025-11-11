@@ -1,6 +1,6 @@
 using GraphQL;
 using GraphQL.Client.Http;
-using GraphQL.Client.Serializer.Newtonsoft;
+using GraphQL.Client.Serializer.SystemTextJson;
 using ListopiaParser.Configs;
 using ListopiaParser.ResponseTypes;
 using Microsoft.Extensions.Options;
@@ -18,7 +18,7 @@ public class HardcoverService
         
         _client = new GraphQLHttpClient(
             new Uri(options.HardcoverURL),
-            new NewtonsoftJsonSerializer(),
+            new SystemTextJsonSerializer(),
             httpClient
         );
     }

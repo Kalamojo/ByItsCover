@@ -10,7 +10,7 @@ public class EditionsResponse
 public class Edition
 {
     public required int Id  { get; init; }
-    [JsonPropertyName("Isbn_13")]
+    [JsonPropertyName("isbn_13")]
     public required string Isbn13  { get; init; }
     public required EditionImage? Image { get; init; }
 }

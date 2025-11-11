@@ -1,8 +1,10 @@
 using AngleSharp;
 using ListopiaParser.Configs;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+// using Newtonsoft.Json;
+// using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace ListopiaParser.Services;
 
@@ -52,9 +54,18 @@ public class ListopiaService
             throw new ArgumentNullException(nameof(scriptElement), "Book page does not have script data to parse");
         }
         
-        var jsonData = (JObject?)JsonConvert.DeserializeObject(scriptElement.TextContent);
-        var isbn = jsonData?.Descendants().OfType<JObject>()
-            .First(x => (string?)x["__typename"] == "BookDetails")["isbn13"];
+        // var jsonData = (JObject?)JsonConvert.DeserializeObject(scriptElement.TextContent);
+        // var isbn = jsonData?.Descendants().OfType<JObject>()
+        //     .First(x => (string?)x["__typename"] == "BookDetails")["isbn13"];
+
+        var jsonData = JsonDocument.Parse(scriptElement.TextContent);
+        var temp = jsonData.RootElement.EnumerateObject();
+        foreach (var jsonProperty in temp)
+        {
+            Console.WriteLine($"{jsonProperty.Name}: {jsonProperty.Value}");
+        }
+
+        var isbn = "";
         
         if (isbn == null)
         {
