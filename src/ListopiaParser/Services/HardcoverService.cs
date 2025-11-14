@@ -23,7 +23,7 @@ public class HardcoverService
         );
     }
 
-    public async Task<List<Edition>> GetBookEditions(string[] isbnArray, CancellationToken cancellationToken)
+    public async Task<List<Edition>> GetBookEditions(List<string> isbnList, CancellationToken cancellationToken)
     {
         var editionsFromIsbnRequest = new GraphQLRequest
         {
@@ -41,11 +41,21 @@ public class HardcoverService
             OperationName = "GetEditionsFromISBN",
             Variables = new
             {
-                isbn_list = isbnArray
+                isbn_list = isbnList
             }
         };
 
         var response = await _client.SendQueryAsync<EditionsResponse>(editionsFromIsbnRequest, cancellationToken);
+        
+        if (response.Errors != null && response.Errors.Any())
+        {
+            var responseDetails = response.AsGraphQLHttpResponse();
+            var exceptions = response.Errors
+                .Select(e =>
+                    new GraphQLHttpRequestException(responseDetails.StatusCode, responseDetails.ResponseHeaders,
+                        e.Message));
+            throw new AggregateException(exceptions);
+        }
         
         Console.WriteLine("Finally did the thing, yknow, with " + response.Data.Editions.Count + " editions");
         

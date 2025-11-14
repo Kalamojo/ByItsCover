@@ -35,25 +35,46 @@ public class ListopiaParserRunner : BackgroundService
         
         var isbnsTaskList = pages.Select(x => _listopiaService.GetListopiaIsbns(x, cancellationToken));
         
-        await foreach (var isbnsTask in Task.WhenEach(isbnsTaskList))
+        await foreach (var isbnsTask in Task.WhenEach(isbnsTaskList).WithCancellation(cancellationToken))
         {
-            var editionsTask = _hardcoverService.GetBookEditions(await isbnsTask, cancellationToken);
-            hardcoverTaskList.Add(editionsTask);
+            try
+            {
+                var editionsTask = _hardcoverService.GetBookEditions(await isbnsTask, cancellationToken);
+                hardcoverTaskList.Add(editionsTask);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error: " + e.Message);
+            }
         }
 
-        await foreach (var hardcoverTask in Task.WhenEach(hardcoverTaskList))
+        await foreach (var hardcoverTask in Task.WhenEach(hardcoverTaskList).WithCancellation(cancellationToken))
         {
-            var coverEmbeddingsTask = _clipService.GetCoverEmbeddings(await hardcoverTask, cancellationToken);
-            clipTaskList.Add(coverEmbeddingsTask);
+            try
+            {
+                var coverEmbeddingsTask = _clipService.GetCoverEmbeddings(await hardcoverTask, cancellationToken);
+                clipTaskList.Add(coverEmbeddingsTask);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error: " + e.Message);
+            }
         }
         
-        await foreach (var clipTask in Task.WhenEach(clipTaskList))
+        await foreach (var clipTask in Task.WhenEach(clipTaskList).WithCancellation(cancellationToken))
         {
-            var covers = (await clipTask).ToList();
-            await collection.UpsertAsync(covers, cancellationToken);
-            embeddingsUploaded += covers.Count(x => x.Embedding != null);
-            // var embeddingsTask = _clipService.GetCoverEmbeddings(await hardcoverTask, cancellationToken);
-            // clipTaskList.Add(embeddingsTask);
+            try
+            {
+                var covers = (await clipTask).ToList();
+                await collection.UpsertAsync(covers, cancellationToken);
+                embeddingsUploaded += covers.Count(x => x.Embedding != null);
+                // var embeddingsTask = _clipService.GetCoverEmbeddings(await hardcoverTask, cancellationToken);
+                // clipTaskList.Add(embeddingsTask);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error: " + e.Message);
+            }
         }
         
         Console.WriteLine("Number of embeddings to upload: " + embeddingsUploaded);

@@ -1,10 +1,7 @@
 using AngleSharp;
 using ListopiaParser.Configs;
 using Microsoft.Extensions.Options;
-// using Newtonsoft.Json;
-// using Newtonsoft.Json.Linq;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace ListopiaParser.Services;
 
@@ -23,7 +20,7 @@ public class ListopiaService
         _context = BrowsingContext.New(config);
     }
     
-    public async Task<string[]> GetListopiaIsbns(int pageNumber, CancellationToken cancellationToken)
+    public async Task<List<string>> GetListopiaIsbns(int pageNumber, CancellationToken cancellationToken)
     {
         Console.WriteLine("Starting listopia parse page " + pageNumber);
         var request = new HttpRequestMessage(HttpMethod.Get, ToAbsolute(_options.ListopiaURL, $"?page={pageNumber}"));
@@ -35,8 +32,20 @@ public class ListopiaService
         var bookTitleElements = document.QuerySelectorAll("#all_votes tr a.bookTitle");
         var bookUrls = bookTitleElements.Select(x => ToAbsolute(_options.GoodreadsBase, x.GetAttribute("href"))).ToList();
 
-        var isbnArray = await Task.WhenAll(bookUrls.Select(x => GetBookIsbn(x, cancellationToken)));
-        return isbnArray;
+        //var isbnArray = await Task.WhenAll(bookUrls.Select(x => GetBookIsbn(x, cancellationToken)));
+        var isbnList = new List<string>();
+        await foreach (var isbnTask in Task.WhenEach(bookUrls.Select(x => GetBookIsbn(x, cancellationToken))).WithCancellation(cancellationToken))
+        {
+            try
+            {
+                isbnList.Add(await isbnTask);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error: " + e.Message);
+            }
+        }
+        return isbnList;
     }
 
     private async Task<string> GetBookIsbn(string url, CancellationToken cancellationToken)
@@ -53,26 +62,30 @@ public class ListopiaService
         {
             throw new ArgumentNullException(nameof(scriptElement), "Book page does not have script data to parse");
         }
-        
-        // var jsonData = (JObject?)JsonConvert.DeserializeObject(scriptElement.TextContent);
-        // var isbn = jsonData?.Descendants().OfType<JObject>()
-        //     .First(x => (string?)x["__typename"] == "BookDetails")["isbn13"];
 
+        string? isbn = null;
         var jsonData = JsonDocument.Parse(scriptElement.TextContent);
-        var temp = jsonData.RootElement.EnumerateObject();
-        foreach (var jsonProperty in temp)
+        var stateNode = jsonData.RootElement
+            .GetProperty("props")
+            .GetProperty("pageProps")
+            .GetProperty("apolloState")
+            .EnumerateObject();
+        foreach (var property in stateNode)
         {
-            Console.WriteLine($"{jsonProperty.Name}: {jsonProperty.Value}");
+            if (property.Name.StartsWith("Book:"))
+            {
+                isbn = property.Value.GetProperty("details").GetProperty("isbn13").GetString();
+                //Console.WriteLine($"{property.Name}: {property.Value}");
+                break;
+            }
         }
-
-        var isbn = "";
         
         if (isbn == null)
         {
             throw new ArgumentNullException(nameof(isbn), "ISBN-13 was not found");
         }
         
-        return isbn.ToString();
+        return isbn;
     }
     
     private static string ToAbsolute(string startingUrl, string? relativeUrl)
