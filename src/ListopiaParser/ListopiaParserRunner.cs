@@ -1,35 +1,46 @@
+using ListopiaParser.Configs;
+using ListopiaParser.Interfaces;
 using ListopiaParser.ResponseTypes;
-using ListopiaParser.Services;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel.Connectors.PgVector;
 
 namespace ListopiaParser;
 
 public class ListopiaParserRunner : BackgroundService
 {
-    private readonly ListopiaService _listopiaService;
-    private readonly HardcoverService _hardcoverService;
-    private readonly ClipService _clipService;
+    private readonly IListopiaService _listopiaService;
+    private readonly IHardcoverService _hardcoverService;
+    private readonly IClipService _clipService;
     private readonly PostgresVectorStore _vectorStore;
-    private const int Pages = 2;
+    private readonly ListopiaOptions _listopiaOptions;
+    private readonly PgVectorOptions _pgVectorOptions;
+    private readonly ILogger<ListopiaParserRunner> _logger;
 
-    public ListopiaParserRunner(ListopiaService listopiaService,  HardcoverService hardcoverService,  ClipService clipService,  PostgresVectorStore vectorStore)
+    public ListopiaParserRunner(IListopiaService listopiaService,  IHardcoverService hardcoverService,
+        IClipService clipService, PostgresVectorStore vectorStore, IOptions<ListopiaOptions> listopiaOptions,
+        IOptions<PgVectorOptions> pgVectorOptions, ILogger<ListopiaParserRunner> logger)
     {
         _listopiaService = listopiaService;
         _hardcoverService = hardcoverService;
         _clipService = clipService;
         _vectorStore = vectorStore;
+        _listopiaOptions = listopiaOptions.Value;
+        _pgVectorOptions = pgVectorOptions.Value;
+        _logger = logger;
     }
     
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        Console.WriteLine("Howdy");
+        _logger.LogInformation("Listopia Parser starting...");
 
-        var collection = _vectorStore.GetCollection<int, Cover>(Constants.CollectionName);
-        await collection.EnsureCollectionExistsAsync(cancellationToken);
+        var collection = _vectorStore.GetCollection<int, Cover>(_pgVectorOptions.CollectionName);
+        var exists = await collection.CollectionExistsAsync(cancellationToken);
+        _logger.LogInformation($"Collection {_pgVectorOptions.CollectionName} exists status: {exists}");
 
         var embeddingsUploaded = 0;
-        var pages = Enumerable.Range(1, Pages);
+        var pages = Enumerable.Range(1, _listopiaOptions.Pages);
         var hardcoverTaskList = new List<Task<List<Edition>>>();
         var clipTaskList = new List<Task<IEnumerable<Cover>>>();
         
@@ -44,7 +55,7 @@ public class ListopiaParserRunner : BackgroundService
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error: " + e.Message);
+                _logger.LogError(e, "Error: " + e.Message);
             }
         }
 
@@ -57,7 +68,7 @@ public class ListopiaParserRunner : BackgroundService
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error: " + e.Message);
+                _logger.LogError(e, "Error: " + e.Message);
             }
         }
         
@@ -68,15 +79,14 @@ public class ListopiaParserRunner : BackgroundService
                 var covers = (await clipTask).ToList();
                 await collection.UpsertAsync(covers, cancellationToken);
                 embeddingsUploaded += covers.Count(x => x.Embedding != null);
-                // var embeddingsTask = _clipService.GetCoverEmbeddings(await hardcoverTask, cancellationToken);
-                // clipTaskList.Add(embeddingsTask);
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error: " + e.Message);
+                _logger.LogError(e, "Error: " + e.Message);
             }
         }
         
-        Console.WriteLine("Number of embeddings to upload: " + embeddingsUploaded);
+        _logger.LogInformation("Number of embeddings uploaded: " + embeddingsUploaded);
+        _logger.LogInformation("Listopia Parser completed");
     }
 }

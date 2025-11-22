@@ -2,28 +2,32 @@ using GraphQL;
 using GraphQL.Client.Http;
 using GraphQL.Client.Serializer.SystemTextJson;
 using ListopiaParser.Configs;
+using ListopiaParser.Interfaces;
 using ListopiaParser.ResponseTypes;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace ListopiaParser.Services;
 
-public class HardcoverService
+public class HardcoverService : IHardcoverService
 {
     private readonly GraphQLHttpClient _client;
+    private readonly ILogger<HardcoverService> _logger;
     
-    public HardcoverService(HttpClient httpClient, IOptions<HardcoverOptions> hardcoverOptions)
+    public HardcoverService(HttpClient httpClient, IOptions<HardcoverOptions> hardcoverOptions, ILogger<HardcoverService> logger)
     {
         var options = hardcoverOptions.Value;
-        httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + options.Token);
+        _logger = logger;
         
+        httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + options.Token);
         _client = new GraphQLHttpClient(
-            new Uri(options.HardcoverURL),
+            new Uri(options.HardcoverUrl),
             new SystemTextJsonSerializer(),
             httpClient
         );
     }
 
-    public async Task<List<Edition>> GetBookEditions(List<string> isbnList, CancellationToken cancellationToken)
+    public async Task<List<Edition>> GetBookEditions(IEnumerable<string> isbnList, CancellationToken cancellationToken)
     {
         var editionsFromIsbnRequest = new GraphQLRequest
         {
@@ -57,7 +61,7 @@ public class HardcoverService
             throw new AggregateException(exceptions);
         }
         
-        Console.WriteLine("Finally did the thing, yknow, with " + response.Data.Editions.Count + " editions");
+        _logger.LogInformation($"Retrieved {response.Data.Editions.Count} editions");
         
         return response.Data.Editions;
     }

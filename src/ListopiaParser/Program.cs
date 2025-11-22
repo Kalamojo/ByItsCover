@@ -1,11 +1,10 @@
 ﻿using ListopiaParser;
 using ListopiaParser.Configs;
+using ListopiaParser.Interfaces;
 using ListopiaParser.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Npgsql;
-
 
 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? string.Empty;
 var connString = Environment.GetEnvironmentVariable("PGVECTOR_CONN") ?? string.Empty;
@@ -20,15 +19,10 @@ builder.Configuration
 builder.Services.Configure<ListopiaOptions>(builder.Configuration.GetSection("ListopiaOptions"));
 builder.Services.Configure<HardcoverOptions>(builder.Configuration.GetSection("HardcoverOptions"));
 builder.Services.Configure<ClipOptions>(builder.Configuration.GetSection("ClipOptions"));
-builder.Services.AddHttpClient<ListopiaService>();
-builder.Services.AddHttpClient<HardcoverService>();
-builder.Services.AddHttpClient<ClipService>();
-// builder.Services.AddSingleton<NpgsqlDataSource>(sp =>
-// {
-//     var dataSourceBuilder = new NpgsqlDataSourceBuilder(connString);
-//     dataSourceBuilder.UseVector();
-//     return dataSourceBuilder.Build();
-// });
+builder.Services.Configure<PgVectorOptions>(builder.Configuration.GetSection("PgVectorOptions"));
+builder.Services.AddHttpClient<IListopiaService, ListopiaService>();
+builder.Services.AddHttpClient<IHardcoverService, HardcoverService>();
+builder.Services.AddHttpClient<IClipService, ClipService>();
 builder.Services.AddPostgresVectorStore(connString);
 builder.Services.AddHostedService<ListopiaParserRunner>();
 

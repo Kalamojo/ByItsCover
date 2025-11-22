@@ -2,19 +2,23 @@ using AngleSharp;
 using ListopiaParser.Configs;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using ListopiaParser.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace ListopiaParser.Services;
 
-public class ListopiaService
+public class ListopiaService : IListopiaService
 {
     private readonly HttpClient _client;
     private readonly ListopiaOptions _options;
     private readonly IBrowsingContext _context;
+    private readonly ILogger<ListopiaService> _logger;
 
-    public ListopiaService(HttpClient client, IOptions<ListopiaOptions> options)
+    public ListopiaService(HttpClient client, IOptions<ListopiaOptions> options, ILogger<ListopiaService> logger)
     {
         _client = client;
         _options = options.Value;
+        _logger = logger;
         
         var config = Configuration.Default.WithDefaultLoader();
         _context = BrowsingContext.New(config);
@@ -22,8 +26,8 @@ public class ListopiaService
     
     public async Task<List<string>> GetListopiaIsbns(int pageNumber, CancellationToken cancellationToken)
     {
-        Console.WriteLine("Starting listopia parse page " + pageNumber);
-        var request = new HttpRequestMessage(HttpMethod.Get, ToAbsolute(_options.ListopiaURL, $"?page={pageNumber}"));
+        _logger.LogInformation("Starting listopia parse page " + pageNumber);
+        var request = new HttpRequestMessage(HttpMethod.Get, ToAbsolute(_options.ListopiaUrl, $"?page={pageNumber}"));
         var response = await _client.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         var htmlContent = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -32,7 +36,6 @@ public class ListopiaService
         var bookTitleElements = document.QuerySelectorAll("#all_votes tr a.bookTitle");
         var bookUrls = bookTitleElements.Select(x => ToAbsolute(_options.GoodreadsBase, x.GetAttribute("href"))).ToList();
 
-        //var isbnArray = await Task.WhenAll(bookUrls.Select(x => GetBookIsbn(x, cancellationToken)));
         var isbnList = new List<string>();
         await foreach (var isbnTask in Task.WhenEach(bookUrls.Select(x => GetBookIsbn(x, cancellationToken))).WithCancellation(cancellationToken))
         {
@@ -42,7 +45,7 @@ public class ListopiaService
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error: " + e.Message);
+                _logger.LogError(e, "Error: " + e.Message);
             }
         }
         return isbnList;
@@ -70,12 +73,12 @@ public class ListopiaService
             .GetProperty("pageProps")
             .GetProperty("apolloState")
             .EnumerateObject();
+        
         foreach (var property in stateNode)
         {
             if (property.Name.StartsWith("Book:"))
             {
                 isbn = property.Value.GetProperty("details").GetProperty("isbn13").GetString();
-                //Console.WriteLine($"{property.Name}: {property.Value}");
                 break;
             }
         }

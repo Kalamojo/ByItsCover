@@ -1,12 +1,13 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using ListopiaParser.Configs;
+using ListopiaParser.Interfaces;
 using ListopiaParser.ResponseTypes;
 using Microsoft.Extensions.Options;
 
 namespace ListopiaParser.Services;
 
-public class ClipService
+public class ClipService : IClipService
 {
     private readonly HttpClient _client;
     private readonly ClipOptions _options;
@@ -19,7 +20,7 @@ public class ClipService
 
     public async Task<IEnumerable<Cover>> GetCoverEmbeddings(List<Edition> editionList, CancellationToken cancellationToken)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, _options.ClipURL);
+        var request = new HttpRequestMessage(HttpMethod.Post, _options.ClipUrl);
         request.Content = JsonContent.Create( new
         {
             image_urls = editionList.Select(x => x.Image?.Url)

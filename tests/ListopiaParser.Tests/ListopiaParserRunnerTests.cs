@@ -1,0 +1,98 @@
+using ListopiaParser.Configs;
+using ListopiaParser.Interfaces;
+using ListopiaParser.ResponseTypes;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Testcontainers.PostgreSql;
+using Moq;
+
+namespace ListopiaParser.Tests;
+
+public class ListopiaParserRunnerTests
+{
+    private Mock<IListopiaService> _listopiaServiceMock;
+    private Mock<IHardcoverService> _hardcoverServiceMock;
+    private Mock<IClipService> _clipServiceMock;
+    private PostgreSqlContainer _pgVectorContainer;
+    private IOptions<ListopiaOptions> _listopiaOptions;
+    private IOptions<PgVectorOptions> _pgVectorOptions;
+    private ListopiaOptions _listopiaOptionValues;
+    private PgVectorOptions _pgVectorOptionValues;
+    private Mock<ILogger<ListopiaParserRunner>> _loggerMock;
+    private IServiceCollection _services;
+    private IHostedService? _sut;
+    
+    [SetUp]
+    public async Task Setup()
+    {
+        _listopiaServiceMock = new Mock<IListopiaService>();
+        _hardcoverServiceMock = new Mock<IHardcoverService>();
+        _clipServiceMock = new Mock<IClipService>();
+        _loggerMock = new Mock<ILogger<ListopiaParserRunner>>();
+        _listopiaOptionValues = new ListopiaOptions
+        {
+            GoodreadsBase = "https://www.goodreads.com",
+            ListopiaUrl = "https://www.goodreads.com/list/show/001.TestList",
+            Pages = 10
+        };
+        _pgVectorOptionValues = new PgVectorOptions
+        {
+            VectorDimensions = 512,
+            CollectionName = "covers_scraped"
+        };
+        _listopiaOptions = Options.Create(_listopiaOptionValues);
+        _pgVectorOptions = Options.Create(_pgVectorOptionValues);
+
+        _pgVectorContainer = new PostgreSqlBuilder()
+            .WithImage("pgvector/pgvector:pg16")
+            .Build();
+        await _pgVectorContainer.StartAsync();
+        
+        _services = new ServiceCollection();
+        _services.AddSingleton<IHostedService, ListopiaParserRunner>();
+        _services.AddSingleton(_listopiaServiceMock.Object);
+        _services.AddSingleton(_hardcoverServiceMock.Object);
+        _services.AddSingleton(_clipServiceMock.Object);
+        _services.AddSingleton(_listopiaOptions);
+        _services.AddSingleton(_pgVectorOptions);
+        _services.AddSingleton(_loggerMock.Object);
+        _services.AddPostgresVectorStore(_pgVectorContainer.GetConnectionString());
+        
+        var serviceProvider = _services.BuildServiceProvider();
+        _sut = serviceProvider.GetService<IHostedService>();
+    }
+    
+    [Test]
+    public async Task TestExecuteAsync()
+    {
+        Assert.That(_sut, Is.Not.Null);
+        
+        await _sut.StartAsync(CancellationToken.None);
+        await Task.Delay(500);
+        await _sut.StopAsync(CancellationToken.None);
+        
+        _listopiaServiceMock.Verify(x => x.GetListopiaIsbns(
+            It.IsInRange(1, _listopiaOptionValues.Pages, Moq.Range.Inclusive),
+            It.IsAny<CancellationToken>()
+            ), 
+            Times.Exactly(_listopiaOptionValues.Pages));
+        _hardcoverServiceMock.Verify(x => x.GetBookEditions(
+                It.IsAny<List<string>>(),
+                It.IsAny<CancellationToken>()
+            ), 
+            Times.Exactly(_listopiaOptionValues.Pages));
+        _clipServiceMock.Verify(x => x.GetCoverEmbeddings(
+                It.IsAny<List<Edition>>(),
+                It.IsAny<CancellationToken>()
+            ), 
+            Times.Exactly(_listopiaOptionValues.Pages));
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        await _pgVectorContainer.DisposeAsync();
+    }
+}
