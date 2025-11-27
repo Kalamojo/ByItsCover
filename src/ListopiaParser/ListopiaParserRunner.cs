@@ -36,9 +36,8 @@ public class ListopiaParserRunner : BackgroundService
         _logger.LogInformation("Listopia Parser starting...");
 
         var collection = _vectorStore.GetCollection<int, Cover>(_pgVectorOptions.CollectionName);
-        var exists = await collection.CollectionExistsAsync(cancellationToken);
-        _logger.LogInformation($"Collection {_pgVectorOptions.CollectionName} exists status: {exists}");
-
+        await collection.EnsureCollectionExistsAsync(cancellationToken);
+        
         var embeddingsUploaded = 0;
         var pages = Enumerable.Range(1, _listopiaOptions.Pages);
         var hardcoverTaskList = new List<Task<List<Edition>>>();

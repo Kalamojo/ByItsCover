@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using Testcontainers.PostgreSql;
 using Moq;
 
@@ -51,6 +52,20 @@ public class ListopiaParserRunnerTests
         await _pgVectorContainer.StartAsync();
         
         _services = new ServiceCollection();
+        
+        _services.AddSingleton<NpgsqlDataSource>(sp =>
+        {
+            NpgsqlDataSourceBuilder dataSourceBuilder = new(_pgVectorContainer.GetConnectionString());
+            dataSourceBuilder.UseVector();
+            var datasource = dataSourceBuilder.Build();
+        
+            var conn = datasource.OpenConnection();
+            using var cmd = new NpgsqlCommand("CREATE EXTENSION IF NOT EXISTS vector", conn);
+            cmd.ExecuteNonQuery();
+            return datasource;
+        });
+        _services.AddPostgresVectorStore();
+        
         _services.AddSingleton<IHostedService, ListopiaParserRunner>();
         _services.AddSingleton(_listopiaServiceMock.Object);
         _services.AddSingleton(_hardcoverServiceMock.Object);
@@ -58,7 +73,6 @@ public class ListopiaParserRunnerTests
         _services.AddSingleton(_listopiaOptions);
         _services.AddSingleton(_pgVectorOptions);
         _services.AddSingleton(_loggerMock.Object);
-        _services.AddPostgresVectorStore(_pgVectorContainer.GetConnectionString());
         
         var serviceProvider = _services.BuildServiceProvider();
         _sut = serviceProvider.GetService<IHostedService>();
@@ -70,7 +84,7 @@ public class ListopiaParserRunnerTests
         Assert.That(_sut, Is.Not.Null);
         
         await _sut.StartAsync(CancellationToken.None);
-        await Task.Delay(500);
+        await Task.Delay(500, CancellationToken.None);
         await _sut.StopAsync(CancellationToken.None);
         
         _listopiaServiceMock.Verify(x => x.GetListopiaIsbns(
