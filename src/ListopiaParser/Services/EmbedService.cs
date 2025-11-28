@@ -25,6 +25,7 @@ public class EmbedService : IEmbedService
         {
             image_urls = editionList.Select(x => x.Image?.Url)
         });
+        var temp = await request.Content.ReadAsStringAsync();
         var response = await _client.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         

@@ -5,9 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
 using Npgsql;
 using Testcontainers.PostgreSql;
-using Moq;
 
 namespace ListopiaParser.Tests;
 

@@ -12,7 +12,6 @@ public class EmbedServiceTests
     private IOptions<EmbedOptions> _options;
     private EmbedOptions _optionValues;
     private MockHttpMessageHandler _mockHttp;
-    private MockedRequest _expectedRequest;
     private EmbedService _sut;
     
     [SetUp]
@@ -23,10 +22,7 @@ public class EmbedServiceTests
             EmbedUrl = "http://127.0.0.1:8000/predict"
         };
         _options = Options.Create(_optionValues);
-        
         _mockHttp = new MockHttpMessageHandler();
-        _expectedRequest = _mockHttp.When(_optionValues.EmbedUrl)
-            .Respond("application/json", "{\"image_embeddings\": [[1.0, 2.0, 3.0]]}");
         
         var client = new HttpClient(_mockHttp);
         _sut =  new EmbedService(client, _options);
@@ -58,13 +54,22 @@ public class EmbedServiceTests
                 Embedding = new ReadOnlyMemory<float>(expectedEmbeddings)
             }
         };
+        var expectedRequest = _mockHttp.Expect(_optionValues.EmbedUrl)
+            .WithJsonContent(new 
+            {
+                image_urls = new[] 
+                { 
+                    "https://www.randomsite.com/test.png" 
+                }
+            })
+            .Respond("application/json", "{\"image_embeddings\":[[1.0, 2.0, 3.0]]}");
 
         var covers = await _sut.GetCoverEmbeddings(editionList, CancellationToken.None);
         var coversList = covers.ToList();
         
+        Assert.That(_mockHttp.GetMatchCount(expectedRequest), Is.EqualTo(1));
         Assert.That(coversList, Is.Not.Null);
         Assert.That(coversList.Count,  Is.EqualTo(1));
-        Assert.That(_mockHttp.GetMatchCount(_expectedRequest), Is.EqualTo(1));
         coversList.Should().BeEquivalentTo(expectedCovers, options => options
             .Using<ReadOnlyMemory<float>?>(ctx =>
             {
