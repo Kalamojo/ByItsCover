@@ -53,7 +53,7 @@ public class ListopiaParserRunnerTests
         
         _services = new ServiceCollection();
         
-        _services.AddSingleton<NpgsqlDataSource>(sp =>
+        _services.AddSingleton<NpgsqlDataSource>(_ =>
         {
             NpgsqlDataSourceBuilder dataSourceBuilder = new(_pgVectorContainer.GetConnectionString());
             dataSourceBuilder.UseVector();
