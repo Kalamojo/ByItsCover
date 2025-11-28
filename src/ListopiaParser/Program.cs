@@ -17,7 +17,7 @@ builder.Configuration
     .AddUserSecrets<Program>(true, true)
     .AddEnvironmentVariables();
 
-builder.Services.AddSingleton<NpgsqlDataSource>(sp =>
+builder.Services.AddSingleton<NpgsqlDataSource>(_ =>
 {
     NpgsqlDataSourceBuilder dataSourceBuilder = new(connString);
     dataSourceBuilder.UseVector();
