@@ -3,7 +3,7 @@ terraform {
     organization = "ByItsCover"
 
     workspaces {
-      name    = "By_Its_Cover_Dev"
+      name = "By_Its_Cover_Dev"
     }
   }
 
