@@ -1,3 +1,7 @@
+
+# Destroying Infra
+
+/*
 resource "aws_rds_cluster" "covercluster" {
   cluster_identifier  = var.rds_cluster_id
   engine              = "aurora-postgresql"
@@ -23,3 +27,4 @@ resource "aws_rds_cluster_instance" "covercluster_instance" {
   engine             = aws_rds_cluster.covercluster.engine
   engine_version     = aws_rds_cluster.covercluster.engine_version
 }
+*/
